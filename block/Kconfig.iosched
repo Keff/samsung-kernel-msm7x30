@@ -53,15 +53,6 @@ config IOSCHED_SIO
 	  basic merging, trying to keep a minimum overhead. It is aimed
 	  mainly for aleatory access devices (eg: flash devices).
 
-config IOSCHED_SIOPLUS
-	tristate "Simple I/O scheduler plus"
-	default n
-	---help---
-	  The Simple I/O scheduler plus borrow the code from its parent
-	  (Simple I/O scheduler) and fixes writes_starved not being
-	  initialized on startup and also modifies the write starvation 
-	  counting logic.
-
 config IOSCHED_CFQ
 	tristate "CFQ I/O scheduler"
 	# If BLK_CGROUP is a module, CFQ has to be built as module.
@@ -129,9 +120,6 @@ choice
 	config DEFAULT_SIO
 		bool "SIO" if IOSCHED_SIO=y
 
-	config DEFAULT_SIOPLUS
-		bool "SIOPLUS" if IOSCHED_SIOPLUS=y
-
 	config DEFAULT_CFQ
 		bool "CFQ" if IOSCHED_CFQ=y
 
@@ -148,7 +136,6 @@ config DEFAULT_IOSCHED
 	default "deadline" if DEFAULT_DEADLINE
 	default "row" if DEFAULT_ROW
 	default "sio" if DEFAULT_SIO
-	default "sioplus" if DEFAULT_SIOPLUS
 	default "cfq" if DEFAULT_CFQ
 	default "bfq" if DEFAULT_BFQ
 	default "noop" if DEFAULT_NOOP
