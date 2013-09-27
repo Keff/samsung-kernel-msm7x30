@@ -1425,9 +1425,14 @@ static int exfat_write_end(struct file *file, struct address_space *mapping,
 	return err;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,13,0)
+static ssize_t exfat_direct_IO(int rw, struct kiocb *iocb, struct iov_iter *iter,
+						loff_t offset)
+#else
 static ssize_t exfat_direct_IO(int rw, struct kiocb *iocb,
 					   const struct iovec *iov,
 					   loff_t offset, unsigned long nr_segs)
+#endif
 {
 	struct inode *inode = iocb->ki_filp->f_mapping->host;
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,34)
@@ -1436,12 +1441,21 @@ static ssize_t exfat_direct_IO(int rw, struct kiocb *iocb,
 	ssize_t ret;
 
 	if (rw == WRITE) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,13,0)
+		if (EXFAT_I(inode)->mmu_private < (offset + iov_iter_count(iter)))
+#else
 		if (EXFAT_I(inode)->mmu_private < (offset + iov_length(iov, nr_segs)))
+#endif
 			return 0;
 	}
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,00)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,2,00)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,13,0)
+	ret = blockdev_direct_IO(rw, iocb, inode, iter,
+					offset, exfat_get_block);
+#else
 	ret = blockdev_direct_IO(rw, iocb, inode, iov,
 					offset, nr_segs, exfat_get_block);
+#endif
 #else
         ret = blockdev_direct_IO(rw, iocb, inode, inode->i_sb->s_bdev, iov,
 					offset, nr_segs, exfat_get_block, NULL);
@@ -1449,7 +1463,11 @@ static ssize_t exfat_direct_IO(int rw, struct kiocb *iocb,
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,34)
 	if ((ret < 0) && (rw & WRITE))
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,13,0)
+		exfat_write_failed(mapping, offset+iov_iter_count(iter));
+#else
 		exfat_write_failed(mapping, offset+iov_length(iov, nr_segs));
+#endif
 #endif
 	return ret;
 }
@@ -1568,7 +1586,7 @@ static int exfat_fill_inode(struct inode *inode, FILE_ID_T *fid)
 
 		i_size_write(inode, info.Size);
 		EXFAT_I(inode)->mmu_private = i_size_read(inode);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,00)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,2,00)
 		set_nlink(inode,info.NumSubdirs);
 #else
 		inode->i_nlink = info.NumSubdirs;
@@ -1698,7 +1716,7 @@ static void exfat_evict_inode(struct inode *inode)
 	if (!inode->i_nlink)
 		i_size_write(inode, 0);
 	invalidate_inode_buffers(inode);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,7,00)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,5,0)
 	end_writeback(inode);
 #else
 	clear_inode(inode);
@@ -2072,7 +2090,7 @@ static int exfat_read_root(struct inode *inode)
 
 	exfat_save_attr(inode, ATTR_SUBDIR);
 	inode->i_mtime = inode->i_atime = inode->i_ctime = ts;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,00)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,2,00)
 	set_nlink(inode,info.NumSubdirs + 2);
 #else
 	inode->i_nlink = info.NumSubdirs + 2;
@@ -2145,11 +2163,6 @@ static int exfat_fill_super(struct super_block *sb, void *data, int silent)
 	}
 
 	sbi->nls_io = load_nls(sbi->options.iocharset);
-	if (!sbi->nls_io) {
-		printk(KERN_ERR "[EXFAT] IO charset %s not found\n",
-			   sbi->options.iocharset);
-		goto out_fail2;
-	}
 
 	error = -ENOMEM;
 	root_inode = new_inode(sb);
