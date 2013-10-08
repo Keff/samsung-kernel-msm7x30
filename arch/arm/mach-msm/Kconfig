@@ -1620,6 +1620,13 @@ config MSM_CPU_FREQ_OVERCLOCKING
 	help
 	  Enabling this option allow to use all overclock frequencies.
 
+config HIGH_MEMORY
+	bool "Enable 360MB of free RAM"
+	depends on ARCH_MSM7X30
+	default n
+	help
+	  Enabling this option to have slightly higher 360MB of free ram.
+
 endif # CPU_FREQ_MSM
 
 config MSM_CPU_AVS
