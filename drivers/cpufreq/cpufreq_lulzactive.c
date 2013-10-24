@@ -993,8 +993,9 @@ static int cpufreq_governor_lulzactive(struct cpufreq_policy *new_policy,
 			LOGI("CPUFREQ_GOV_STOP\n");
 		}
 		pcpu->governor_enabled = 0;
+		pcpu->idle_exit_time = 0;
 
-		if (atomic_dec_return(&active_count) > 0)
+		if (atomic_dec_return(&active_count) > 1)
 			return 0;
 
 		sysfs_remove_group(cpufreq_global_kobject,
